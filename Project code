@@ -1,0 +1,46 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from xgboost import XGBRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+# Load datasets and merge
+data_mental = pd.read_csv('prevalence-by-mental-and-substance-use-disorder.csv')
+data_share = pd.read_csv('mental-and-substance-use-as-share-of-disease.csv')
+merged_data = pd.merge(data_mental, data_share).drop("Code", axis=1)
+
+# Rename columns using a different method
+merged_data.columns = ['Country', 'Year', 'Schizo', 'Bipolar', 'Eating', 'Anxiety', 'DrugUse', 'Depressive', 'AlcoholUse', 'DALY']
+
+# Encode categorical features
+label_encoder = LabelEncoder()
+for col in merged_data.select_dtypes(include=['object']).columns:
+    merged_data[col] = label_encoder.fit_transform(merged_data[col])
+
+# Split data into train, validation, and test sets
+train_data, remaining_data = train_test_split(merged_data, test_size=0.2, random_state=42)
+valid_data, test_data = train_test_split(remaining_data, test_size=0.5, random_state=42)
+
+# Prepare data for modeling
+X_train = train_data.drop(columns=['DALY'])
+y_train = train_data['DALY']
+X_valid = valid_data.drop(columns=['DALY'])
+y_valid = valid_data['DALY']
+
+# Train XGBoost model
+xgb_model = XGBRegressor(n_estimators=300, learning_rate=0.2, max_depth=5, random_state=42)
+xgb_model.fit(X_train, y_train)
+
+# Predict on validation set
+y_valid_pred_xgb = xgb_model.predict(X_valid)
+
+# Evaluate performance
+mse_xgb = mean_squared_error(y_valid, y_valid_pred_xgb)
+mae_xgb = mean_absolute_error(y_valid, y_valid_pred_xgb)
+r2_xgb = r2_score(y_valid, y_valid_pred_xgb)
+
+# Print results with different variable names
+print("XGBoost Regression Performance:")
+print(f"Mean Squared Error: {mse_xgb:.4f}")
+print(f"Mean Absolute Error: {mae_xgb:.4f}")
+print(f"R-squared: {r2_xgb:.4f}")
